@@ -1,9 +1,9 @@
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 groups = VkKeyboard(one_time=True)
-groups.add_button('10', VkKeyboardColor.POSITIVE)
-groups.add_line()
 groups.add_button('11', VkKeyboardColor.POSITIVE)
+groups.add_line()
+groups.add_button('10', VkKeyboardColor.POSITIVE)
 groups.add_line()
 groups.add_button('Отмена', VkKeyboardColor.NEGATIVE)
 
