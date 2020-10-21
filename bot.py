@@ -26,7 +26,9 @@ class Bot:
         ]
 
     def handle(self, data):
-        event = VkBotMessageEvent(data)
+        event = data
+        if type(event) is not VkBotMessageEvent:
+            event = VkBotMessageEvent(event)
         msg = event.object
         if msg.text:
             with user_db:
