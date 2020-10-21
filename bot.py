@@ -150,8 +150,8 @@ class Bot:
             query = User.select().where(User.group.in_(('10', '11'))).order_by(User.last_name, User.first_name)
             for n, receiver in enumerate(query):
                 receivers += f'{n+1}. {receiver.last_name} {receiver.first_name}\n'
-            self.send(receivers, user.vk_id)
-            self.send('Введите номера получателей из списка через пробел', user.vk_id, keyboard=keyboards.cancel)
+            self.send(receivers, user.vk_id, keyboard=keyboards.cancel)
+            self.send('Введите номера получателей из списка через пробел', user.vk_id)
         elif state == states.ADMIN_MESSAGE_INPUT:
             self.send('Введите сообщение', user.vk_id, keyboard=keyboards.cancel)
         else:
