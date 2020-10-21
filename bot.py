@@ -34,8 +34,14 @@ class Bot:
                 if user is None:
                     logger.info(f'New user {msg.peer_id}')
                     user_info = self.vk.users.get(user_ids=msg.peer_id)[0]
-                    user_name = ' '.join((user_info.get('first_name', ''), user_info.get('last_name', '')))
-                    user = User.create(vk_id=str(msg.peer_id), name=user_name, state=states.USER_NEW)
+                    first_name = user_info.get('first_name', '')
+                    last_name = user_info.get('last_name', '')
+                    user = User.create(
+                        vk_id=str(msg.peer_id),
+                        first_name=first_name,
+                        last_name=last_name,
+                        state=states.USER_NEW
+                    )
                 for stage in self.stages:
                     try:
                         if stage(msg, user):
@@ -100,7 +106,7 @@ class Bot:
             else:
                 ctx = []
                 nums = msg.text.split()
-                query = User.select().where(User.group.in_(('10', '11'))).order_by(User.name)
+                query = User.select().where(User.group.in_(('10', '11'))).order_by(User.last_name, User.first_name)
                 for n, receiver in enumerate(query):
                     if str(n+1) in nums:
                         ctx.append(receiver.vk_id)
@@ -139,9 +145,9 @@ class Bot:
             self.send('Выберите класс', user.vk_id, keyboard=keyboards.groups)
         elif state == states.ADMIN_RECEIVER_SELECTION:
             receivers = ''
-            query = User.select().where(User.group.in_(('10', '11'))).order_by(User.name)
+            query = User.select().where(User.group.in_(('10', '11'))).order_by(User.last_name, User.first_name)
             for n, receiver in enumerate(query):
-                receivers += f'{n+1}. {receiver.name}\n'
+                receivers += f'{n+1}. {receiver.last_name} {receiver.first_name}\n'
             self.send(receivers, user.vk_id)
             self.send('Введите номера получателей из списка через пробел', user.vk_id, keyboard=keyboards.cancel)
         elif state == states.ADMIN_MESSAGE_INPUT:
