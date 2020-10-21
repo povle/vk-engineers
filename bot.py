@@ -63,7 +63,7 @@ class Bot:
     def stage_init_user(self, msg, user):
         if user.state == states.USER_NEW:
             if msg.peer_id in config.admins:
-                self.set_user_state(user, states.ADMIN_DEFAULT)
+                self.set_user_state(user, states.ADMIN_DEFAULT, message='Добро пожаловать')
             else:
                 self.set_user_state(user, states.USER_INIT)
             return True
@@ -71,12 +71,10 @@ class Bot:
     def stage_handle_user_init(self, msg, user):
         if user.state == 'user_init':
             if msg.text in ('10', '11'):
-                self.set_user_state(user, states.USER_DEFAULT)
+                self.set_user_state(user, states.USER_DEFAULT, message='Спасибо. Если захочешь отписаться - напиши стоп')
                 user.group = msg.text
-                self.send('Спасибо. Если захочешь отписаться - напиши стоп', msg.peer_id)
             else:
-                self.set_user_state(user, states.USER_NEW)
-                self.send('Если передумаешь - отправь любое сообщение.', msg.peer_id)
+                self.set_user_state(user, states.USER_NEW, message='Если передумаешь - отправь любое сообщение.')
             return True
 
     def stage_handle_user_default(self, msg, user):
@@ -102,7 +100,7 @@ class Bot:
             if msg.text in ('10', '11'):
                 self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=msg.text)
             else:
-                self.set_user_state(user, states.ADMIN_DEFAULT)
+                self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
             return True
 
     def stage_handle_receiver_group_selection(self, msg, user):
@@ -110,11 +108,12 @@ class Bot:
             if msg.text in ('10', '11'):
                 self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION, state_context=msg.text)
             else:
-                self.set_user_state(user, states.ADMIN_DEFAULT)
+                self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
             return True
 
     def stage_handle_unread_group_selection(self, msg, user):
         if user.state == states.ADMIN_UNREAD_GROUP_SELECTION:
+            message = 'Отменено'
             if msg.text in ('10', '11'):
                 ans = ''
                 ids = []
@@ -131,14 +130,14 @@ class Bot:
                         ans += '\n'
                     except Exception as e:
                         ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
-                self.send(ans, msg.peer_id)
-            self.set_user_state(user, states.ADMIN_DEFAULT)
+                message = ans
+            self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
             return True
 
     def stage_handle_receiver_selection(self, msg, user):
         if user.state == states.ADMIN_RECEIVER_SELECTION:
             if msg.text == 'Отмена':
-                self.set_user_state(user, states.ADMIN_DEFAULT)
+                self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
             else:
                 ctx = []
                 nums = msg.text.split()
@@ -161,41 +160,54 @@ class Bot:
                         self.send(msg.text, getattr(receiver, 'vk_id', receiver))
                     except Exception:
                         pass
-            self.set_user_state(user, states.ADMIN_DEFAULT)
+                message = 'Отправлено'
+            else:
+                message = 'Отменено'
+            self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
             return True
 
 #-------------------------------------UTILS-------------------------------------
 
-    def set_user_state(self, user: User, state: str, state_context=None):
+    def set_user_state(self, user: User, state: str, state_context=None, message=None):
         # i know that this probably should be in User class
         # but most transitions are vk api bound so it's much cleaner here
+        keyboard = None
+
         if state == states.USER_NEW:
             pass
         elif state == states.USER_INIT:
-            self.send('Выбери свой класс', user.vk_id, keyboard=keyboards.groups)
+            _message = 'Выбери свой класс'
+            keyboard = keyboards.groups
         elif state == states.USER_DEFAULT:
             pass
         elif state == states.ADMIN_DEFAULT:
-            self.send('ОК', user.vk_id, keyboard=keyboards.admin_default)
+            _message = 'ОК'
+            keyboard = keyboards.admin_default
         elif state in (
             states.ADMIN_BROADCAST_GROUP_SELECTION,
             states.ADMIN_RECEIVER_GROUP_SELECTION,
             states.ADMIN_UNREAD_GROUP_SELECTION
             ):
-            self.send('Выберите класс', user.vk_id, keyboard=keyboards.groups)
+            _message = 'Выберите класс'
+            keyboard = keyboards.groups
         elif state == states.ADMIN_RECEIVER_SELECTION:
-            receivers = ''
+            _message = ''
             query = User.select().where(User.group == state_context).order_by(User.last_name, User.first_name)
             for n, receiver in enumerate(query):
-                receivers += f'{n+1}. {receiver.last_name} {receiver.first_name}\n'
-            self.send(receivers, user.vk_id, keyboard=keyboards.cancel)
-            self.send('Введите номера получателей из списка через пробел', user.vk_id)
+                _message += f'{n+1}. {receiver.last_name} {receiver.first_name}\n'
+            _message += '\nВведите номера получателей из списка через пробел'
+            keyboard = keyboards.cancel
         elif state == states.ADMIN_MESSAGE_INPUT:
-            self.send('Введите сообщение', user.vk_id, keyboard=keyboards.cancel)
+            _message = 'Введите сообщение'
+            keyboard = keyboards.cancel
         else:
             raise states.StateError
         user.state = state
         user.state_context = state_context
+
+        message = message or _message
+        if message:
+            self.send(message, user.vk_id, keyboard=keyboard)
 
     def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None):
         _attachments = []
