@@ -21,6 +21,7 @@ class Bot:
             self.stage_handle_user_default,
             self.stage_handle_admin_default,
             self.stage_handle_broadcast_group_selection,
+            self.stage_handle_receiver_group_selection,
             self.stage_handle_receiver_selection,
             self.stage_handle_message_input,
         ]
@@ -90,13 +91,21 @@ class Bot:
             if msg.text == 'Написать классу':
                 self.set_user_state(user, states.ADMIN_BROADCAST_GROUP_SELECTION)
             elif msg.text == 'Написать отдельным людям':
-                self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION)
+                self.set_user_state(user, states.ADMIN_RECEIVER_GROUP_SELECTION)
             return True
 
     def stage_handle_broadcast_group_selection(self, msg, user):
         if user.state == states.ADMIN_BROADCAST_GROUP_SELECTION:
             if msg.text in ('10', '11'):
                 self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=msg.text)
+            else:
+                self.set_user_state(user, states.ADMIN_DEFAULT)
+            return True
+
+    def stage_handle_receiver_group_selection(self, msg, user):
+        if user.state == states.ADMIN_RECEIVER_GROUP_SELECTION:
+            if msg.text in ('10', '11'):
+                self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION, state_context=msg.text)
             else:
                 self.set_user_state(user, states.ADMIN_DEFAULT)
             return True
@@ -108,7 +117,7 @@ class Bot:
             else:
                 ctx = []
                 nums = msg.text.split()
-                query = User.select().where(User.group.in_(('10', '11'))).order_by(User.last_name, User.first_name)
+                query = User.select().where(User.group == user.state_context).order_by(User.last_name, User.first_name)
                 for n, receiver in enumerate(query):
                     if str(n+1) in nums:
                         ctx.append(receiver.vk_id)
@@ -143,11 +152,11 @@ class Bot:
             pass
         elif state == states.ADMIN_DEFAULT:
             self.send('ОК', user.vk_id, keyboard=keyboards.admin_default)
-        elif state == states.ADMIN_BROADCAST_GROUP_SELECTION:
+        elif state in (states.ADMIN_BROADCAST_GROUP_SELECTION, states.ADMIN_RECEIVER_GROUP_SELECTION):
             self.send('Выберите класс', user.vk_id, keyboard=keyboards.groups)
         elif state == states.ADMIN_RECEIVER_SELECTION:
             receivers = ''
-            query = User.select().where(User.group.in_(('10', '11'))).order_by(User.last_name, User.first_name)
+            query = User.select().where(User.group == state_context).order_by(User.last_name, User.first_name)
             for n, receiver in enumerate(query):
                 receivers += f'{n+1}. {receiver.last_name} {receiver.first_name}\n'
             self.send(receivers, user.vk_id, keyboard=keyboards.cancel)
