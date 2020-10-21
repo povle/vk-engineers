@@ -206,7 +206,7 @@ class Bot:
         user.state_context = state_context
 
         message = message or _message
-        if message:
+        if message or keyboard:
             self.send(message, user.vk_id, keyboard=keyboard)
 
     def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None):
