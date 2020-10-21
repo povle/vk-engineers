@@ -132,6 +132,8 @@ class Bot:
                         ans += '\n'
                     except Exception as e:
                         ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
+                if not ids:
+                    ans = 'В выбранном классе нет ни одного ученика'
                 message = ans
             self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
             return True
@@ -147,7 +149,10 @@ class Bot:
                 for n, receiver in enumerate(query):
                     if str(n+1) in nums:
                         ctx.append(receiver.vk_id)
-                self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=','.join(ctx))
+                if len(ctx) != len(nums):
+                    self.send('Некоторых или всех введенных индексов не существует. Введите номера заново', msg.peer_id)
+                else:
+                    self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=','.join(ctx))
             return True
 
     def stage_handle_message_input(self, msg, user):
@@ -197,6 +202,9 @@ class Bot:
             query = User.select().where(User.group == state_context).order_by(User.last_name, User.first_name)
             for n, receiver in enumerate(query):
                 _message += f'{n+1}. {receiver.last_name} {receiver.first_name}\n'
+            if not _message:
+                self.set_user_state(user, states.ADMIN_DEFAULT, message='В выбранном классе нет ни одного ученика')
+                return
             _message += '\nВведите номера получателей из списка через пробел'
             keyboard = keyboards.cancel
         elif state == states.ADMIN_MESSAGE_INPUT:
