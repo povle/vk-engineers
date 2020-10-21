@@ -16,14 +16,14 @@ class Bot:
         self.vk_session = vk_api.VkApi(token=self.token)
         self.vk = self.vk_session.get_api()
         self.stages = [
-                        self.stage_init_user,
-                        self.stage_handle_user_init,
-                        self.stage_handle_user_default,
-                        self.stage_handle_admin_default,
-                        self.stage_handle_broadcast_group_selection,
-                        self.stage_handle_receiver_selection,
-                        self.stage_handle_message_input,
-                      ]
+            self.stage_init_user,
+            self.stage_handle_user_init,
+            self.stage_handle_user_default,
+            self.stage_handle_admin_default,
+            self.stage_handle_broadcast_group_selection,
+            self.stage_handle_receiver_selection,
+            self.stage_handle_message_input,
+        ]
 
     def handle(self, data):
         event = VkBotMessageEvent(data)
