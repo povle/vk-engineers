@@ -22,6 +22,7 @@ class Bot:
             self.stage_handle_admin_default,
             self.stage_handle_broadcast_group_selection,
             self.stage_handle_receiver_group_selection,
+            self.stage_handle_unread_group_selection,
             self.stage_handle_receiver_selection,
             self.stage_handle_message_input,
         ]
@@ -92,6 +93,8 @@ class Bot:
                 self.set_user_state(user, states.ADMIN_BROADCAST_GROUP_SELECTION)
             elif msg.text == 'Написать отдельным людям':
                 self.set_user_state(user, states.ADMIN_RECEIVER_GROUP_SELECTION)
+            elif msg.text == 'Посмотреть список прочитавших':
+                self.set_user_state(user, states.ADMIN_UNREAD_GROUP_SELECTION)
             return True
 
     def stage_handle_broadcast_group_selection(self, msg, user):
@@ -108,6 +111,28 @@ class Bot:
                 self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION, state_context=msg.text)
             else:
                 self.set_user_state(user, states.ADMIN_DEFAULT)
+            return True
+
+    def stage_handle_unread_group_selection(self, msg, user):
+        if user.state == states.ADMIN_UNREAD_GROUP_SELECTION:
+            if msg.text in ('10', '11'):
+                ans = ''
+                ids = []
+                query = User.select().where(User.group == msg.text).order_by(User.last_name, User.first_name)
+                for receiver in query:
+                    ids.append(receiver.vk_id)
+                vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(ids))['items']
+                vk_data = {str(x['peer']['id']): x for x in vk_data}
+                for n, receiver in enumerate(query):
+                    try:
+                        read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
+                        ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
+                        ans += '✅' if read else '❌'
+                        ans += '\n'
+                    except Exception as e:
+                        ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
+                self.send(ans, msg.peer_id)
+            self.set_user_state(user, states.ADMIN_DEFAULT)
             return True
 
     def stage_handle_receiver_selection(self, msg, user):
@@ -152,7 +177,11 @@ class Bot:
             pass
         elif state == states.ADMIN_DEFAULT:
             self.send('ОК', user.vk_id, keyboard=keyboards.admin_default)
-        elif state in (states.ADMIN_BROADCAST_GROUP_SELECTION, states.ADMIN_RECEIVER_GROUP_SELECTION):
+        elif state in (
+            states.ADMIN_BROADCAST_GROUP_SELECTION,
+            states.ADMIN_RECEIVER_GROUP_SELECTION,
+            states.ADMIN_UNREAD_GROUP_SELECTION
+            ):
             self.send('Выберите класс', user.vk_id, keyboard=keyboards.groups)
         elif state == states.ADMIN_RECEIVER_SELECTION:
             receivers = ''
