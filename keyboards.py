@@ -1,6 +1,6 @@
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-groups = VkKeyboard(one_time=False)
+groups = VkKeyboard(one_time=True)
 groups.add_button('10')
 groups.add_line()
 groups.add_button('11')
