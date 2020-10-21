@@ -175,3 +175,4 @@ config.py
 proto.py
 test*.py
 *.db
+*.conf
