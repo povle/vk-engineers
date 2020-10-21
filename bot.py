@@ -120,7 +120,9 @@ class Bot:
                 query = User.select().where(User.group == msg.text).order_by(User.last_name, User.first_name)
                 for receiver in query:
                     ids.append(receiver.vk_id)
-                vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(ids))['items']
+                vk_data = []
+                if ids:
+                    vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(ids))['items']
                 vk_data = {str(x['peer']['id']): x for x in vk_data}
                 for n, receiver in enumerate(query):
                     try:
