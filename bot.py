@@ -128,7 +128,13 @@ class Bot:
                     try:
                         read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
                         ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
-                        ans += '✅' if read else '❌'
+
+                        if not vk_data[receiver.vk_id]['can_write']['allowed']:
+                            emoji = '❗️'
+                        else:
+                            emoji = '✅' if read else '❌'
+
+                        ans += emoji
                         ans += '\n'
                     except Exception as e:
                         ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
