@@ -176,3 +176,4 @@ proto.py
 test*.py
 *.db
 *.conf
+log/*
