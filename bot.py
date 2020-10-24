@@ -126,9 +126,9 @@ class Bot:
                 vk_data = {str(x['peer']['id']): x for x in vk_data}
                 for n, receiver in enumerate(query):
                     try:
-                        read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
                         ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
 
+                        read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
                         if not vk_data[receiver.vk_id]['can_write']['allowed']:
                             emoji = '❗️'
                         else:
