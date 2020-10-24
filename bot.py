@@ -83,6 +83,7 @@ class Bot:
             if text == 'стоп':
                 user.delete_instance()
                 self.send('Если передумаешь - отправь любое сообщение.', msg.peer_id)
+                logger.info(f'Deleted {user.vk_id}')
             return True
 
     def stage_handle_admin_default(self, msg, user):
@@ -220,6 +221,7 @@ class Bot:
             raise states.StateError
         user.state = state
         user.state_context = state_context
+        logger.info(f'Changed {user.vk_id} state to {state}')
 
         message = message or _message
         if message or keyboard:
