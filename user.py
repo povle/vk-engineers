@@ -14,3 +14,6 @@ class User(pw.Model):
 
     class Meta:
         database = user_db
+
+
+User.create_table()
