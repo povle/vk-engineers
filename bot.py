@@ -70,8 +70,13 @@ class Bot:
 
     def stage_handle_user_init(self, msg, user):
         if user.state == 'user_init':
-            if msg.text in ('10', '11'):
-                self.set_user_state(user, states.USER_DEFAULT, message='Спасибо. Если захочешь отписаться - напиши стоп')
+            if msg.text == 'Задать вопрос куратору':
+                message = '''Любые вопросы вы можете задать [elenasergeevnas|Елене Сергеевне] - куратору Инженерного класса Школы 2036'''
+                self.send(message, msg.peer_id)
+            elif msg.text in ('10', '11'):
+                message = '''Спасибо. Теперь ты подключен к боту "Инженеры 2036" и будешь в курсе важных событий.
+Если захочешь отписаться - напиши стоп'''
+                self.set_user_state(user, states.USER_DEFAULT, message=message)
                 user.group = msg.text
             else:
                 self.set_user_state(user, states.USER_NEW, message='Если передумаешь - отправь любое сообщение.')
@@ -186,22 +191,22 @@ class Bot:
         # i know that this probably should be in User class
         # but most transitions are vk api bound so it's much cleaner here
         keyboard = None
+        _message = None
 
         if state == states.USER_NEW:
-            pass
+            keyboard = keyboards.empty
         elif state == states.USER_INIT:
             _message = 'Выбери свой класс'
-            keyboard = keyboards.groups
+            keyboard = keyboards.init
         elif state == states.USER_DEFAULT:
-            pass
+            keyboard = keyboards.empty
         elif state == states.ADMIN_DEFAULT:
             _message = 'ОК'
             keyboard = keyboards.admin_default
         elif state in (
-            states.ADMIN_BROADCAST_GROUP_SELECTION,
-            states.ADMIN_RECEIVER_GROUP_SELECTION,
-            states.ADMIN_UNREAD_GROUP_SELECTION
-            ):
+                states.ADMIN_BROADCAST_GROUP_SELECTION,
+                states.ADMIN_RECEIVER_GROUP_SELECTION,
+                states.ADMIN_UNREAD_GROUP_SELECTION):
             _message = 'Выберите класс'
             keyboard = keyboards.groups
         elif state == states.ADMIN_RECEIVER_SELECTION:
