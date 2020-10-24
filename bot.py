@@ -93,7 +93,9 @@ class Bot:
 
     def stage_handle_admin_default(self, msg, user):
         if user.state == states.ADMIN_DEFAULT:
-            if msg.text == 'Написать классу':
+            if msg.peer_id not in config.admins:
+                self.set_user_state(user, states.USER_NEW, message='Вы больше не администратор')
+            elif msg.text == 'Написать классу':
                 self.set_user_state(user, states.ADMIN_BROADCAST_GROUP_SELECTION)
             elif msg.text == 'Написать отдельным людям':
                 self.set_user_state(user, states.ADMIN_RECEIVER_GROUP_SELECTION)
