@@ -15,17 +15,17 @@ class Bot:
         self.token = token
         self.vk_session = vk_api.VkApi(token=self.token)
         self.vk = self.vk_session.get_api()
-        self.stages = [
-            self.stage_init_user,
-            self.stage_handle_user_init,
-            self.stage_handle_user_default,
-            self.stage_handle_admin_default,
-            self.stage_handle_broadcast_group_selection,
-            self.stage_handle_receiver_group_selection,
-            self.stage_handle_unread_group_selection,
-            self.stage_handle_receiver_selection,
-            self.stage_handle_message_input,
-        ]
+        self.handlers = {
+            states.USER_NEW: self.handle_user_new,
+            states.USER_INIT: self.handle_user_init,
+            states.USER_DEFAULT: self.handle_user_default,
+            states.ADMIN_DEFAULT: self.handle_admin_default,
+            states.ADMIN_BROADCAST_GROUP_SELECTION: self.handle_broadcast_group_selection,
+            states.ADMIN_RECEIVER_GROUP_SELECTION: self.handle_receiver_group_selection,
+            states.ADMIN_UNREAD_GROUP_SELECTION: self.handle_unread_group_selection,
+            states.ADMIN_RECEIVER_SELECTION: self.handle_receiver_selection,
+            states.ADMIN_MESSAGE_INPUT: self.handle_message_input,
+        }
 
     def handle(self, data):
         event = data
@@ -46,146 +46,131 @@ class Bot:
                         last_name=last_name,
                         state=states.USER_NEW
                     )
-                for stage in self.stages:
-                    try:
-                        if stage(msg, user):
-                            logger.info(f'Handled by {stage.__name__} : {msg}')
-                            user.save()
-                            return
-                    except Exception as e:
-                        logger.exception(e)
-                        self.set_user_state(user, user.state)
-                        self.send(f'Ошибка: {e}', msg.peer_id)
-            logger.debug(f'Rejected by all stages : {msg}')
+                try:
+                    handler = self.handlers.get(user.state, self.handle_other)
+                    handler(msg, user)
+                    logger.info(f'Handled by {handler.__name__} : {msg}')
+                    user.save()
+                except Exception as e:
+                    logger.exception(e)
+                    self.set_user_state(user, user.state)
+                    self.send(f'Ошибка: {e}', msg.peer_id)
         logger.debug(f'No text: {msg}')
 
 #------------------------------------STAGES-------------------------------------
-    def stage_init_user(self, msg, user):
-        if user.state == states.USER_NEW:
-            if msg.peer_id in config.admins:
-                self.set_user_state(user, states.ADMIN_DEFAULT, message='Добро пожаловать')
-            else:
-                self.set_user_state(user, states.USER_INIT)
-            return True
+    def handle_user_new(self, msg, user):
+        if msg.peer_id in config.admins:
+            self.set_user_state(user, states.ADMIN_DEFAULT, message='Добро пожаловать')
+        else:
+            self.set_user_state(user, states.USER_INIT)
+        return True
 
-    def stage_handle_user_init(self, msg, user):
-        if user.state == 'user_init':
-            if msg.text == 'Задать вопрос куратору':
-                message = '''Любые вопросы вы можете задать [elenasergeevnas|Елене Сергеевне] - куратору Инженерного класса Школы 2036'''
-                self.send(message, msg.peer_id)
-            elif msg.text in ('10', '11'):
-                message = '''Спасибо. Теперь ты подключен к боту "Инженеры 2036" и будешь в курсе важных событий.
+    def handle_user_init(self, msg, user):
+        if msg.text == 'Задать вопрос куратору':
+            message = '''Любые вопросы вы можете задать [elenasergeevnas|Елене Сергеевне] - куратору Инженерного класса Школы 2036'''
+            self.send(message, msg.peer_id)
+        elif msg.text in ('10', '11'):
+            message = '''Спасибо. Теперь ты подключен к боту "Инженеры 2036" и будешь в курсе важных событий.
 Если захочешь отписаться - напиши стоп'''
-                self.set_user_state(user, states.USER_DEFAULT, message=message)
-                user.group = msg.text
+            self.set_user_state(user, states.USER_DEFAULT, message=message)
+            user.group = msg.text
+        else:
+            self.set_user_state(user, states.USER_NEW, message='Если передумаешь - отправь любое сообщение.')
+        return True
+
+    def handle_user_default(self, msg, user):
+        text = msg.text.casefold()
+        if text == 'стоп':
+            user.delete_instance()
+            self.send('Если передумаешь - отправь любое сообщение.', msg.peer_id)
+            logger.info(f'Deleted {user.vk_id}')
+
+    def handle_admin_default(self, msg, user):
+        if msg.peer_id not in config.admins:
+            self.set_user_state(user, states.USER_NEW, message='Вы больше не администратор')
+        elif msg.text == 'Написать классу':
+            self.set_user_state(user, states.ADMIN_BROADCAST_GROUP_SELECTION)
+        elif msg.text == 'Написать отдельным людям':
+            self.set_user_state(user, states.ADMIN_RECEIVER_GROUP_SELECTION)
+        elif msg.text == 'Посмотреть список прочитавших':
+            self.set_user_state(user, states.ADMIN_UNREAD_GROUP_SELECTION)
+
+    def handle_broadcast_group_selection(self, msg, user):
+        if msg.text in ('10', '11'):
+            self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=msg.text)
+        else:
+            self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
+
+    def handle_receiver_group_selection(self, msg, user):
+        if msg.text in ('10', '11'):
+            self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION, state_context=msg.text)
+        else:
+            self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
+
+    def handle_unread_group_selection(self, msg, user):
+        message = 'Отменено'
+        if msg.text in ('10', '11'):
+            ans = ''
+            ids = []
+            query = User.select().where(User.group == msg.text).order_by(User.last_name, User.first_name)
+            for receiver in query:
+                ids.append(receiver.vk_id)
+            vk_data = []
+            if ids:
+                vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(ids))['items']
+            vk_data = {str(x['peer']['id']): x for x in vk_data}
+            for n, receiver in enumerate(query):
+                try:
+                    ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
+
+                    read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
+                    if not vk_data[receiver.vk_id]['can_write']['allowed']:
+                        emoji = '❗️'
+                    else:
+                        emoji = '✅' if read else '❌'
+
+                    ans += emoji
+                    ans += '\n'
+                except Exception as e:
+                    ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
+            if not ids:
+                ans = 'В выбранном классе нет ни одного ученика'
+            message = ans
+        self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
+
+    def handle_receiver_selection(self, msg, user):
+        if msg.text == 'Отмена':
+            self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
+        else:
+            ctx = []
+            nums = msg.text.split()
+            query = User.select().where(User.group == user.state_context).order_by(User.last_name, User.first_name)
+            for n, receiver in enumerate(query):
+                if str(n+1) in nums:
+                    ctx.append(receiver.vk_id)
+            if len(ctx) != len(nums):
+                self.send('Некоторых или всех введенных индексов не существует. Введите номера заново', msg.peer_id)
             else:
-                self.set_user_state(user, states.USER_NEW, message='Если передумаешь - отправь любое сообщение.')
-            return True
+                self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=','.join(ctx))
 
-    def stage_handle_user_default(self, msg, user):
-        if user.state == states.USER_DEFAULT:
-            text = msg.text.casefold()
-            if text == 'стоп':
-                user.delete_instance()
-                self.send('Если передумаешь - отправь любое сообщение.', msg.peer_id)
-                logger.info(f'Deleted {user.vk_id}')
-            return True
-
-    def stage_handle_admin_default(self, msg, user):
-        if user.state == states.ADMIN_DEFAULT:
-            if msg.peer_id not in config.admins:
-                self.set_user_state(user, states.USER_NEW, message='Вы больше не администратор')
-            elif msg.text == 'Написать классу':
-                self.set_user_state(user, states.ADMIN_BROADCAST_GROUP_SELECTION)
-            elif msg.text == 'Написать отдельным людям':
-                self.set_user_state(user, states.ADMIN_RECEIVER_GROUP_SELECTION)
-            elif msg.text == 'Посмотреть список прочитавших':
-                self.set_user_state(user, states.ADMIN_UNREAD_GROUP_SELECTION)
-            return True
-
-    def stage_handle_broadcast_group_selection(self, msg, user):
-        if user.state == states.ADMIN_BROADCAST_GROUP_SELECTION:
-            if msg.text in ('10', '11'):
-                self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=msg.text)
+    def handle_message_input(self, msg, user):
+        if msg.text != 'Отмена':
+            if user.state_context in ('10', '11'):
+                receivers = User.select().where(User.group == user.state_context)
             else:
-                self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
-            return True
-
-    def stage_handle_receiver_group_selection(self, msg, user):
-        if user.state == states.ADMIN_RECEIVER_GROUP_SELECTION:
-            if msg.text in ('10', '11'):
-                self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION, state_context=msg.text)
-            else:
-                self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
-            return True
-
-    def stage_handle_unread_group_selection(self, msg, user):
-        if user.state == states.ADMIN_UNREAD_GROUP_SELECTION:
+                receivers = user.state_context.split(',')
+            for receiver in receivers:
+                try:
+                    self.send(msg.text, getattr(receiver, 'vk_id', receiver))
+                except Exception:
+                    pass
+            message = 'Отправлено'
+        else:
             message = 'Отменено'
-            if msg.text in ('10', '11'):
-                ans = ''
-                ids = []
-                query = User.select().where(User.group == msg.text).order_by(User.last_name, User.first_name)
-                for receiver in query:
-                    ids.append(receiver.vk_id)
-                vk_data = []
-                if ids:
-                    vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(ids))['items']
-                vk_data = {str(x['peer']['id']): x for x in vk_data}
-                for n, receiver in enumerate(query):
-                    try:
-                        ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
+        self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
 
-                        read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
-                        if not vk_data[receiver.vk_id]['can_write']['allowed']:
-                            emoji = '❗️'
-                        else:
-                            emoji = '✅' if read else '❌'
-
-                        ans += emoji
-                        ans += '\n'
-                    except Exception as e:
-                        ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
-                if not ids:
-                    ans = 'В выбранном классе нет ни одного ученика'
-                message = ans
-            self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
-            return True
-
-    def stage_handle_receiver_selection(self, msg, user):
-        if user.state == states.ADMIN_RECEIVER_SELECTION:
-            if msg.text == 'Отмена':
-                self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
-            else:
-                ctx = []
-                nums = msg.text.split()
-                query = User.select().where(User.group == user.state_context).order_by(User.last_name, User.first_name)
-                for n, receiver in enumerate(query):
-                    if str(n+1) in nums:
-                        ctx.append(receiver.vk_id)
-                if len(ctx) != len(nums):
-                    self.send('Некоторых или всех введенных индексов не существует. Введите номера заново', msg.peer_id)
-                else:
-                    self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=','.join(ctx))
-            return True
-
-    def stage_handle_message_input(self, msg, user):
-        if user.state == states.ADMIN_MESSAGE_INPUT:
-            if msg.text != 'Отмена':
-                if user.state_context in ('10', '11'):
-                    receivers = User.select().where(User.group == user.state_context)
-                else:
-                    receivers = user.state_context.split(',')
-                for receiver in receivers:
-                    try:
-                        self.send(msg.text, getattr(receiver, 'vk_id', receiver))
-                    except Exception:
-                        pass
-                message = 'Отправлено'
-            else:
-                message = 'Отменено'
-            self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
-            return True
+    def handle_other(self, msg, user):
+        pass
 
 #-------------------------------------UTILS-------------------------------------
 
