@@ -63,7 +63,6 @@ class Bot:
             self.set_user_state(user, states.ADMIN_DEFAULT, message='Добро пожаловать')
         else:
             self.set_user_state(user, states.USER_INIT)
-        return True
 
     def handle_user_init(self, msg, user):
         if msg.text == 'Задать вопрос куратору':
@@ -76,7 +75,6 @@ class Bot:
             user.group = msg.text
         else:
             self.set_user_state(user, states.USER_NEW, message='Если передумаешь - отправь любое сообщение.')
-        return True
 
     def handle_user_default(self, msg, user):
         text = msg.text.casefold()
