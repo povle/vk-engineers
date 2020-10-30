@@ -1,6 +1,7 @@
 import vk_api
 import time
 import logging
+import json
 import keyboards
 import states
 import config
@@ -158,7 +159,7 @@ class Bot:
                 receivers = ','.join(receiver.vk_id for receiver in query)
             else:
                 receivers = user.state_context
-            self.send(msg.text, receivers)
+            self.send(msg.text, receivers, source=msg)
             message = 'Отправлено'
         else:
             message = 'Отменено'
@@ -214,7 +215,7 @@ class Bot:
         if message or keyboard:
             self.send(message, user.vk_id, keyboard=keyboard)
 
-    def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None):
+    def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None, source=None):
         _attachments = []
         attachments = attachments.copy()
         if photos or documents:
@@ -240,11 +241,21 @@ class Bot:
         if keyboard is not None:
             keyboard = keyboard.get_keyboard()
 
+        if source is not None:
+            source = {
+                'type': 'message',
+                'owner_id': config.vk_id,
+                'peer_id': source.peer_id,
+                'conversation_message_id': source.conversation_message_id
+            }
+            source = json.dumps(source)
+
         kwargs = {
             'random_id': vk_api.utils.get_random_id(),
             'message': text[:4000],
             'attachment': ','.join(_attachments),
-            'keyboard': keyboard
+            'keyboard': keyboard,
+            'content_source': source
         }
 
         if type(to) in (list, tuple):
