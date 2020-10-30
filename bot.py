@@ -154,14 +154,11 @@ class Bot:
     def handle_message_input(self, msg, user):
         if msg.text != 'Отмена':
             if user.state_context in ('10', '11'):
-                receivers = User.select().where(User.group == user.state_context)
+                query = User.select().where(User.group == user.state_context)
+                receivers = ','.join(receiver.vk_id for receiver in query)
             else:
-                receivers = user.state_context.split(',')
-            for receiver in receivers:
-                try:
-                    self.send(msg.text, getattr(receiver, 'vk_id', receiver))
-                except Exception:
-                    pass
+                receivers = user.state_context
+            self.send(msg.text, receivers)
             message = 'Отправлено'
         else:
             message = 'Отменено'
@@ -243,9 +240,23 @@ class Bot:
         if keyboard is not None:
             keyboard = keyboard.get_keyboard()
 
-        rd_id = vk_api.utils.get_random_id()
-        self.vk.messages.send(peer_id=int(to), random_id=rd_id, message=text[:4000],
-                              attachment=','.join(_attachments), keyboard=keyboard)
+        kwargs = {
+            'random_id': vk_api.utils.get_random_id(),
+            'message': text[:4000],
+            'attachment': ','.join(_attachments),
+            'keyboard': keyboard
+        }
+
+        if type(to) in (list, tuple):
+            to = ','.join(str(x) for x in to)
+
+        if type(to) is str and ',' in to:
+            kwargs['peer_ids'] = to
+        else:
+            kwargs['peer_id'] = to
+
+        response = self.vk.messages.send(**kwargs)
         if len(text) > 4000:
             time.sleep(0.4)
             self.send(text[4000:], to)
+        return response
