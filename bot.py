@@ -33,29 +33,28 @@ class Bot:
         if type(event) is not VkBotMessageEvent:
             event = VkBotMessageEvent(event)
         msg = event.object
-        if msg.text:
-            with user_db:
-                user = User.get_or_none(User.vk_id == str(msg.peer_id))
-                if user is None:
-                    logger.info(f'New user {msg.peer_id}')
-                    user_info = self.vk.users.get(user_ids=msg.peer_id)[0]
-                    first_name = user_info.get('first_name', '')
-                    last_name = user_info.get('last_name', '')
-                    user = User.create(
-                        vk_id=str(msg.peer_id),
-                        first_name=first_name,
-                        last_name=last_name,
-                        state=states.USER_NEW
-                    )
-                try:
-                    handler = self.handlers.get(user.state, self.handle_other)
-                    handler(msg, user)
-                    logger.info(f'Handled by {handler.__name__} : {msg}')
-                    user.save()
-                except Exception as e:
-                    logger.exception(e)
-                    self.set_user_state(user, user.state)
-                    self.send(f'Ошибка: {e}', msg.peer_id)
+        with user_db:
+            user = User.get_or_none(User.vk_id == str(msg.peer_id))
+            if user is None:
+                logger.info(f'New user {msg.peer_id}')
+                user_info = self.vk.users.get(user_ids=msg.peer_id)[0]
+                first_name = user_info.get('first_name', '')
+                last_name = user_info.get('last_name', '')
+                user = User.create(
+                    vk_id=str(msg.peer_id),
+                    first_name=first_name,
+                    last_name=last_name,
+                    state=states.USER_NEW
+                )
+            try:
+                handler = self.handlers.get(user.state, self.handle_other)
+                handler(msg, user)
+                logger.info(f'Handled by {handler.__name__} : {msg}')
+                user.save()
+            except Exception as e:
+                logger.exception(e)
+                self.set_user_state(user, user.state)
+                self.send(f'Ошибка: {e}', msg.peer_id)
         logger.debug(f'No text: {msg}')
 
 #------------------------------------STAGES-------------------------------------
@@ -93,6 +92,35 @@ class Bot:
             self.set_user_state(user, states.ADMIN_RECEIVER_GROUP_SELECTION)
         elif msg.text == 'Посмотреть список прочитавших':
             self.set_user_state(user, states.ADMIN_UNREAD_GROUP_SELECTION)
+        else:
+            reply = self.get_first_forwarded(msg)
+            while self.get_first_forwarded(reply):
+                reply = self.get_first_forwarded(reply)
+            if reply['from_id'] == reply['peer_id']:
+                offset = 1
+            else:
+                offset = 0
+
+            reply = self.vk.messages.getHistory(
+                peer_id=reply['peer_id'],
+                start_message_id=reply['id'],
+                count=1,
+                offset=-offset
+            )['items'][0]
+
+            if reply:
+                reply = self.vk.messages.getById(message_ids=reply['id'])['items'][0]
+                if reply.get('payload'):
+                    payload = json.loads(reply['payload'])
+                    if payload.get('min_id') and payload.get('ids'):
+                        ids = payload['ids']
+                        min_id = payload.get('min_id')
+                        if ids in ('10', '11'):
+                            ans = self.get_group_unread_list(ids, min_id)
+                        else:
+                            query = User.select().where(User.vk_id.in_(ids.split(','))).order_by(User.last_name, User.first_name)
+                            ans = self.get_unread_list(query, min_id)
+                        self.send(ans, msg.peer_id, payload=payload)
 
     def handle_broadcast_group_selection(self, msg, user):
         if msg.text in ('10', '11'):
@@ -109,32 +137,7 @@ class Bot:
     def handle_unread_group_selection(self, msg, user):
         message = 'Отменено'
         if msg.text in ('10', '11'):
-            ans = ''
-            ids = []
-            query = User.select().where(User.group == msg.text).order_by(User.last_name, User.first_name)
-            for receiver in query:
-                ids.append(receiver.vk_id)
-            vk_data = []
-            if ids:
-                vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(ids))['items']
-            vk_data = {str(x['peer']['id']): x for x in vk_data}
-            for n, receiver in enumerate(query):
-                try:
-                    ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
-
-                    read = vk_data[receiver.vk_id]['out_read'] == vk_data[receiver.vk_id]['last_message_id']
-                    if not vk_data[receiver.vk_id]['can_write']['allowed']:
-                        emoji = '❗️'
-                    else:
-                        emoji = '✅' if read else '❌'
-
-                    ans += emoji
-                    ans += '\n'
-                except Exception as e:
-                    ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
-            if not ids:
-                ans = 'В выбранном классе нет ни одного ученика'
-            message = ans
+            message = self.get_group_unread_list(msg.text)
         self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
 
     def handle_receiver_selection(self, msg, user):
@@ -153,24 +156,78 @@ class Bot:
                 self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=','.join(ctx))
 
     def handle_message_input(self, msg, user):
+        payload = None
         if msg.text != 'Отмена':
             if user.state_context in ('10', '11'):
                 query = User.select().where(User.group == user.state_context)
                 receivers = ','.join(receiver.vk_id for receiver in query)
             else:
                 receivers = user.state_context
-            self.send(msg.text, receivers, source=msg)
-            message = 'Отправлено'
+
+            try:
+                vk_data = self.send(msg.text, receivers, source=msg)
+                if type(vk_data) is int:
+                    min_id = vk_data
+                else:
+                    min_id = min(x.get('message_id', float('inf')) for x in vk_data)
+            except vk_api.exceptions.ApiError:
+                min_id = float('inf')
+
+            if min_id < float('inf'):
+                message = 'Отправлено'
+                payload = {
+                    'min_id': min_id,
+                    'ids': receivers
+                }
+            else:
+                message = 'Не удалось отправить ни одному из получателей'
         else:
             message = 'Отменено'
-        self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
+        self.set_user_state(user, states.ADMIN_DEFAULT, message=message, payload=payload)
 
     def handle_other(self, msg, user):
         pass
 
 #-------------------------------------UTILS-------------------------------------
+    @staticmethod
+    def get_first_forwarded(msg):
+        return msg.get('reply_message') or (msg.get('fwd_messages', [])+[None])[0]
 
-    def set_user_state(self, user: User, state: str, state_context=None, message=None):
+    def get_group_unread_list(self, group, msg_id=None):
+        query = User.select().where(User.group == group).order_by(User.last_name, User.first_name)
+        ids = []
+        for receiver in query:
+            ids.append(receiver.vk_id)
+        if ids:
+            ans = self.get_unread_list(query, msg_id)
+        else:
+            ans = 'В выбранном классе нет ни одного ученика'
+        return ans
+
+    def get_unread_list(self, receivers, msg_id=None):
+        ans = ''
+        vk_data = self.vk.messages.getConversationsById(peer_ids=','.join(x.vk_id for x in receivers))['items']
+        vk_data = {str(x['peer']['id']): x for x in vk_data}
+        for n, receiver in enumerate(receivers):
+            try:
+                ans += f'{n+1}. {receiver.last_name} {receiver.first_name} '
+                conv = vk_data[receiver.vk_id]
+                if msg_id:
+                    read = conv['out_read'] >= msg_id
+                else:
+                    read = conv['out_read'] == conv['last_message_id']
+                if not conv['can_write']['allowed']:
+                    emoji = '❗️'
+                else:
+                    emoji = '✅' if read else '❌'
+
+                ans += emoji
+                ans += '\n'
+            except Exception as e:
+                ans += f'{n+1}. {receiver.last_name} {receiver.first_name} {e}\n'
+        return ans
+
+    def set_user_state(self, user: User, state: str, state_context=None, message=None, payload=None):
         # i know that this probably should be in User class
         # but most transitions are vk api bound so it's much cleaner here
         keyboard = None
@@ -213,9 +270,9 @@ class Bot:
 
         message = message or _message
         if message or keyboard:
-            self.send(message, user.vk_id, keyboard=keyboard)
+            self.send(message, user.vk_id, keyboard=keyboard, payload=payload)
 
-    def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None, source=None):
+    def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None, source=None, payload=None):
         _attachments = []
         attachments = attachments.copy()
         if photos or documents:
@@ -250,12 +307,16 @@ class Bot:
             }
             source = json.dumps(source)
 
+        if payload is not None:
+            payload = json.dumps(payload)
+
         kwargs = {
             'random_id': vk_api.utils.get_random_id(),
             'message': text[:4000],
             'attachment': ','.join(_attachments),
             'keyboard': keyboard,
-            'content_source': source
+            'content_source': source,
+            'payload': payload
         }
 
         if type(to) in (list, tuple):
