@@ -94,6 +94,8 @@ class Bot:
             self.set_user_state(user, states.ADMIN_UNREAD_GROUP_SELECTION)
         else:
             reply = self.get_first_forwarded(msg)
+            if not reply:
+                return
             while self.get_first_forwarded(reply):
                 reply = self.get_first_forwarded(reply)
             if reply['from_id'] == reply['peer_id']:
