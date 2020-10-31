@@ -110,19 +110,17 @@ class Bot:
                 offset=-offset
             )['items'][0]
 
-            if reply:
-                reply = self.vk.messages.getById(message_ids=reply['id'])['items'][0]
-                if reply.get('payload'):
-                    payload = json.loads(reply['payload'])
-                    if payload.get('min_id') and payload.get('ids'):
-                        ids = payload['ids']
-                        min_id = payload.get('min_id')
-                        if ids in ('10', '11'):
-                            ans = self.get_group_unread_list(ids, min_id)
-                        else:
-                            query = User.select().where(User.vk_id.in_(ids.split(','))).order_by(User.last_name, User.first_name)
-                            ans = self.get_unread_list(query, min_id)
-                        self.send(ans, msg.peer_id, payload=payload)
+            if reply.get('payload'):
+                payload = json.loads(reply['payload'])
+                if payload.get('min_id') and payload.get('ids'):
+                    ids = payload['ids']
+                    min_id = payload.get('min_id')
+                    if ids in ('10', '11'):
+                        ans = self.get_group_unread_list(ids, min_id)
+                    else:
+                        query = User.select().where(User.vk_id.in_(ids.split(','))).order_by(User.last_name, User.first_name)
+                        ans = self.get_unread_list(query, min_id)
+                    self.send(ans, msg.peer_id, payload=payload)
 
     def handle_broadcast_group_selection(self, msg, user):
         if msg.text in ('10', '11'):
