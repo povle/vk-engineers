@@ -2,7 +2,7 @@ import peewee as pw
 import config
 import states
 
-user_db = pw.SqliteDatabase(config.user_db_path)
+user_db = pw.SqliteDatabase(config.user_db_path, pragmas=[('journal_mode', 'wal')])
 
 class User(pw.Model):
     vk_id = pw.CharField(primary_key=True)
