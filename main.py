@@ -33,7 +33,7 @@ def handle():
                 bot.handle(data)
             return 'ok'
     except Exception as e:
-        logger.error(e)
+        logger.exception(e)
     return 'ok'
 
 
