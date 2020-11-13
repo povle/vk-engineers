@@ -82,6 +82,12 @@ class Bot:
             user.delete_instance()
             self.send('Если передумаешь - отправь любое сообщение.', msg.peer_id)
             logger.info(f'Deleted {user.vk_id}')
+        else:
+            forward = {
+                'peer_id': msg.peer_id,
+                'conversation_message_ids': [msg.conversation_message_id],
+            }
+            self.send(' ', ','.join(str(x) for x in config.admins), forward=forward)
 
     def handle_admin_default(self, msg, user):
         if msg.peer_id not in config.admins:
@@ -272,7 +278,7 @@ class Bot:
         if message or keyboard:
             self.send(message, user.vk_id, keyboard=keyboard, payload=payload)
 
-    def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None, source=None, payload=None):
+    def send(self, text, to, attachments=[], photos=[], documents=[], keyboard=None, source=None, **kwargs):
         _attachments = []
         attachments = attachments.copy()
         if photos or documents:
@@ -307,17 +313,17 @@ class Bot:
             }
             source = json.dumps(source)
 
-        if payload is not None:
-            payload = json.dumps(payload)
+        for arg in kwargs:
+            if type(kwargs[arg]) is dict:
+                kwargs[arg] = json.dumps(kwargs[arg])
 
-        kwargs = {
+        kwargs.update({
             'random_id': vk_api.utils.get_random_id(),
             'message': text[:4000],
             'attachment': ','.join(_attachments),
             'keyboard': keyboard,
-            'content_source': source,
-            'payload': payload
-        }
+            'content_source': source
+        })
 
         if type(to) in (list, tuple):
             to = ','.join(str(x) for x in to)
