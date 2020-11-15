@@ -147,7 +147,7 @@ class Bot:
         self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
 
     def handle_receiver_selection(self, msg, user):
-        if msg.text == 'Отмена':
+        if msg.text.casefold() == 'отмена':
             self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
         else:
             ctx = []
@@ -163,7 +163,7 @@ class Bot:
 
     def handle_message_input(self, msg, user):
         payload = None
-        if msg.text != 'Отмена':
+        if msg.text.casefold() != 'отмена':
             if user.state_context in ('10', '11'):
                 query = User.select().where(User.group == user.state_context)
                 receivers = ','.join(receiver.vk_id for receiver in query)
@@ -263,11 +263,11 @@ class Bot:
             if not _message:
                 self.set_user_state(user, states.ADMIN_DEFAULT, message='В выбранном классе нет ни одного ученика')
                 return
-            _message += '\nВведите номера получателей из списка через пробел'
-            keyboard = keyboards.cancel
+            _message += '\nВведите номера получателей из списка через пробел или напишите "отмена"'
+            keyboard = keyboards.empty
         elif state == states.ADMIN_MESSAGE_INPUT:
-            _message = 'Введите сообщение'
-            keyboard = keyboards.cancel
+            _message = 'Введите сообщение или напишите "отмена"'
+            keyboard = keyboards.empty
         else:
             raise states.StateError
         user.state = state
