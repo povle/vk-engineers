@@ -163,6 +163,9 @@ class Bot:
 
     def handle_message_input(self, msg, user):
         payload = None
+        if not msg.text:
+            self.send('Поддерживается только отправка текста. Введите сообщение или напишите "отмена"', msg.peer_id)
+            return
         if msg.text.casefold() != 'отмена':
             if user.state_context in ('10', '11'):
                 query = User.select().where(User.group == user.state_context)
