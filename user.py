@@ -2,7 +2,7 @@ import peewee as pw
 import config
 import states
 
-user_db = pw.MySQLDatabase(config.user_db_path)
+user_db = pw.MySQLDatabase(config.user_db_path, password=config.user_db_password)
 
 class User(pw.Model):
     vk_id = pw.CharField(primary_key=True, max_length=128)
