@@ -1,8 +1,9 @@
+import time
 import peewee as pw
 import config
 import states
 
-user_db = pw.MySQLDatabase(config.user_db_path, password=config.user_db_password)
+user_db = pw.MySQLDatabase(**config.db_config)
 
 class User(pw.Model):
     vk_id = pw.CharField(primary_key=True, max_length=128)
@@ -16,4 +17,14 @@ class User(pw.Model):
         database = user_db
 
 
-User.create_table()
+exc = None
+for _ in range(config.db_connection_retries):
+    try:
+        User.create_table()
+    except pw.OperationalError as e:
+        exc = e
+        time.sleep(config.db_retry_interval)
+    else:
+        break
+else:
+    raise exc
