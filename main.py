@@ -1,6 +1,6 @@
 from flask import Flask, request
 from bot import Bot
-import logging
+import logging.config
 import config
 
 logging.config.fileConfig('logger.conf')
