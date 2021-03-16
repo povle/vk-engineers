@@ -1,0 +1,16 @@
+vk:
+  token: yourtoken
+  confirmation_code: yourcode
+  secret: yoursecret
+  group_id: 123456
+  admins:
+    - 123
+    - 456
+
+db:
+  connection_retries: 5
+  retry_interval: 5
+  config:
+    database: vk_engineers
+    password: dev
+    host: mysqldb

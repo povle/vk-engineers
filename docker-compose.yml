@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - mysqldb
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/etc/timezone:/etc/timezone:ro"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 5m
+        max-file: "3"
+
+  mysqldb:
+    image: mysql:8.0.23
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=dev
+      - MYSQL_DATABASE=vk_engineers
+    volumes:
+      - mysql:/var/lib/mysql
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/etc/timezone:/etc/timezone:ro"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 5m
+        max-file: "3"
+
+volumes:
+  mysql:

@@ -1,14 +1,14 @@
+from config import config
+import logging
 from flask import Flask, request
 from bot import Bot
-import logging.config
-import config
 
-logging.config.fileConfig('logger.conf')
 logger = logging.getLogger('vk-engineers.'+__name__)
 
-TOKEN = config.token
-confirmation_code = config.confirmation_code
-SECRET = config.secret
+
+TOKEN = config['vk']['token']
+confirmation_code = config['vk']['confirmation_code']
+SECRET = config['vk']['secret']
 
 server = Flask(__name__)
 bot = Bot(token=TOKEN)

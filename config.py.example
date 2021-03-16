@@ -1,6 +1,0 @@
-db_config = {'database': 'vk_engineers', 'password': 'dev'}
-db_connection_retries = 10
-db_retry_interval = 10
-token = 'your vk token'
-vk_id = 1234567 # vk group id
-admins = [123456, 2345678]

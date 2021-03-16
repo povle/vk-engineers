@@ -4,7 +4,7 @@ import logging
 import json
 import keyboards
 import states
-import config
+from config import config
 from user import User, user_db
 from vk_api.bot_longpoll import VkBotMessageEvent
 
@@ -59,7 +59,7 @@ class Bot:
 
 #------------------------------------STAGES-------------------------------------
     def handle_user_new(self, msg, user):
-        if msg.peer_id in config.admins:
+        if msg.peer_id in config['vk']['admins']:
             self.set_user_state(user, states.ADMIN_DEFAULT, message='Добро пожаловать')
         else:
             self.set_user_state(user, states.USER_INIT)
@@ -87,10 +87,10 @@ class Bot:
                 'peer_id': msg.peer_id,
                 'conversation_message_ids': [msg.conversation_message_id],
             }
-            self.send(' ', ','.join(str(x) for x in config.admins), forward=forward)
+            self.send(' ', ','.join(str(x) for x in config['vk']['admins']), forward=forward)
 
     def handle_admin_default(self, msg, user):
-        if msg.peer_id not in config.admins:
+        if msg.peer_id not in config['vk']['admins']:
             self.set_user_state(user, states.USER_NEW, message='Вы больше не администратор')
         elif msg.text == 'Написать классу':
             self.set_user_state(user, states.ADMIN_BROADCAST_GROUP_SELECTION)
@@ -310,7 +310,7 @@ class Bot:
         if source is not None:
             source = {
                 'type': 'message',
-                'owner_id': config.vk_id,
+                'owner_id': config['vk']['group_id'],
                 'peer_id': source.peer_id,
                 'conversation_message_id': source.conversation_message_id
             }

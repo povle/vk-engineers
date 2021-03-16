@@ -172,11 +172,6 @@ dmypy.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python
 proto.py
-test*.py
-*.db
-*.db-*
-*.conf
+#*.db
+#*.db-*
 log/*
-docker-compose.secret.yml
-config/config.yaml
-config/logger.conf
