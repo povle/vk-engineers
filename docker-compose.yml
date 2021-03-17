@@ -28,6 +28,7 @@ services:
       - mysql:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+      - ./config/my.cnf:/etc/mysql/conf.d/my.cnf
     logging:
       driver: json-file
       options:
