@@ -10,10 +10,10 @@ services:
     depends_on:
       - mysqldb
     volumes:
-      - "/etc/localtime:/etc/localtime:ro"
-      - "/etc/timezone:/etc/timezone:ro"
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: 5m
         max-file: "3"
@@ -26,10 +26,10 @@ services:
       - MYSQL_DATABASE=vk_engineers
     volumes:
       - mysql:/var/lib/mysql
-      - "/etc/localtime:/etc/localtime:ro"
-      - "/etc/timezone:/etc/timezone:ro"
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: 5m
         max-file: "3"
