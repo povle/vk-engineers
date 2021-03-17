@@ -2,19 +2,19 @@
 keys=root,vk-engineers
 
 [handlers]
-keys=fileHandler,consoleHandler
+keys=consoleHandler
 
 [formatters]
 keys=formatter
 
 [logger_root]
-level=NOTSET
+level=INFO
 handlers=consoleHandler
 
 [logger_vk-engineers]
 level=INFO
 handlers=consoleHandler
-propagate=1
+propagate=0
 qualname=vk-engineers
 
 [handler_fileHandler]
