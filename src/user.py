@@ -4,6 +4,8 @@ import peewee as pw
 import states
 from config import config
 
+logger = logging.getLogger('vk-engineers.'+__name__)
+
 user_db = pw.MySQLDatabase(**config['db']['config'])
 
 class User(pw.Model):
@@ -22,9 +24,9 @@ exc = None
 for _ in range(config['db']['connection_retries']):
     try:
         User.create_table()
-        logging.info('Connected to db')
+        logger.info('Connected to db')
     except pw.OperationalError as e:
-        logging.error(f'Database connection error: {e}')
+        logger.error(f'Database connection error: {e}')
         exc = e
         time.sleep(config['db']['retry_interval'])
     else:
