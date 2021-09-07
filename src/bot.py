@@ -12,6 +12,8 @@ from vk_api.bot_longpoll import VkBotMessageEvent
 logger = logging.getLogger('vk-engineers.'+__name__)
 
 class Bot:
+    groups = ('10.1', '10.2', '11')
+
     def __init__(self, token):
         self.token = token
         self.vk_session = vk_api.VkApi(token=self.token)
@@ -68,7 +70,7 @@ class Bot:
         if msg.text == 'Задать вопрос куратору':
             message = '''Любые вопросы вы можете задать [elenasergeevnas|Елене Сергеевне] - куратору Инженерного класса Школы 2036'''
             self.send(message, msg.peer_id)
-        elif msg.text in ('10', '11'):
+        elif msg.text in self.groups:
             message = '''Спасибо. Теперь ты подключен к боту "Инженеры 2036" и будешь в курсе важных событий.
 Если захочешь отписаться - напиши стоп'''
             self.set_user_state(user, states.USER_DEFAULT, message=message)
@@ -121,7 +123,7 @@ class Bot:
                 if payload.get('min_id') and payload.get('ids'):
                     ids = payload['ids']
                     min_id = payload.get('min_id')
-                    if ids in ('10', '11'):
+                    if ids in self.groups:
                         ans = self.get_group_unread_list(ids, min_id)
                     else:
                         query = User.select().where(User.vk_id.in_(ids.split(','))).order_by(User.last_name, User.first_name)
@@ -129,20 +131,20 @@ class Bot:
                     self.send(ans, msg.peer_id, payload=payload)
 
     def handle_broadcast_group_selection(self, msg, user):
-        if msg.text in ('10', '11'):
+        if msg.text in self.groups:
             self.set_user_state(user, states.ADMIN_MESSAGE_INPUT, state_context=msg.text)
         else:
             self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
 
     def handle_receiver_group_selection(self, msg, user):
-        if msg.text in ('10', '11'):
+        if msg.text in self.groups:
             self.set_user_state(user, states.ADMIN_RECEIVER_SELECTION, state_context=msg.text)
         else:
             self.set_user_state(user, states.ADMIN_DEFAULT, message='Отменено')
 
     def handle_unread_group_selection(self, msg, user):
         message = 'Отменено'
-        if msg.text in ('10', '11'):
+        if msg.text in self.groups:
             message = self.get_group_unread_list(msg.text)
         self.set_user_state(user, states.ADMIN_DEFAULT, message=message)
 
@@ -167,7 +169,7 @@ class Bot:
             self.send('Поддерживается только отправка текста. Введите сообщение или напишите "отмена"', msg.peer_id)
             return
         if msg.text.casefold() != 'отмена':
-            if user.state_context in ('10', '11'):
+            if user.state_context in self.groups:
                 query = User.select().where(User.group == user.state_context)
                 receivers = ','.join(receiver.vk_id for receiver in query)
             else:
